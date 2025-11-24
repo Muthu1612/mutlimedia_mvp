@@ -1,54 +1,28 @@
-# image_encoder.py
 import torch
 import torch.nn as nn
-import timm
+from torchvision import models
+
 
 class ImageEncoder(nn.Module):
-    """
-    Encoder for single face images.
-    Outputs a fixed-length embedding vector.
-    """
+    def __init__(self, embed_dim=1024):
+        super(ImageEncoder, self).__init__()
 
-    def __init__(
-        self,
-        backbone="efficientnet_b3",
-        pretrained=True,
-        out_dim=512
-    ):
-        super().__init__()
+        # Load pretrained ResNet50
+        base = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 
-        # Load backbone
-        self.model = timm.create_model(
-            backbone,
-            pretrained=pretrained,
-            num_classes=0,   # no classifier
-            global_pool=""   # we will pool manually
-        )
+        # Remove the classification head
+        self.feature_extractor = nn.Sequential(*list(base.children())[:-1])
+        # Output shape: (B, 2048, 1, 1)
 
-        self.frame_feat_dim = self.model.num_features
+        # Project down to desired embedding dimension
+        self.proj = nn.Linear(2048, embed_dim)
 
-        # global pooling
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        # Normalize embeddings for stability
+        self.norm = nn.LayerNorm(embed_dim)
 
-        # projection head (optional)
-        self.proj = nn.Sequential(
-            nn.Linear(self.frame_feat_dim, out_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(out_dim, out_dim)
-        )
-
-        self.out_dim = out_dim
-
-    def forward(self, x):
-        """
-        x: (B, 3, 224, 224)
-        returns: (B, out_dim)
-        """
-        feats = self.model.forward_features(x)   # (B, C, H, W)
-        feats = self.pool(feats).squeeze(-1).squeeze(-1)  # (B, C)
-        feats = self.proj(feats)  # (B, out_dim)
-        return feats
-
-    def get_out_dim(self):
-        return self.out_dim
+    def forward(self, x):  # x: (B, 3, 224, 224)
+        feats = self.feature_extractor(x)             # -> (B, 2048, 1, 1)
+        feats = feats.view(feats.size(0), -1)        # -> (B, 2048)
+        emb = self.proj(feats)                       # -> (B, embed_dim)
+        emb = self.norm(emb)
+        return emb
