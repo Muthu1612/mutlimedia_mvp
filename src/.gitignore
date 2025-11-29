@@ -1,3 +1,5 @@
 deepfake_vs_real_image_detection/*
 .ipynb_checkpoints/*
 */__pycache__/*
+embeddings/*
+ml_model/*
