@@ -1,0 +1,23 @@
+import os
+import librosa
+import gc
+import ast
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import torchaudio  # torchaudio==2.9.0  torch==2.9.0 torchcodec==0.8
+import datasets  # pip install datasets==3.6.0
+from datasets import load_dataset # , load_metric
+
+
+class audio_loader():
+    def __init__(self, path, model_checkpoint):
+        self.model_checkpoint = model_checkpoint
+        self.dataset = self._get_dataloader(path)
+    
+    def _get_dataloader(self, path):
+        if os.path.exists(path):
+            dataset = load_dataset("audiofolder", data_dir=path)  
+        if dataset is None:
+            raise ValueError("No dataset found at the specified path.")
+        return dataset
